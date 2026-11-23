@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Погода в любой точке мира: виджеты с текущей погодой, местным временем и картой">
+  <meta name="theme-color" content="#0b1226">
+  <title>Погода — виджеты и карта</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <header class="app-header">
+      <div class="app-header__logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64">
+          <circle cx="26" cy="26" r="10" fill="#FFC83D"/>
+          <path d="M22 52h24a9 9 0 0 0 0-18 13 13 0 0 0-25-3A10.5 10.5 0 0 0 22 52z" fill="#EEF3FA"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="app-header__title">Погода</h1>
+        <p class="app-header__subtitle">Текущая погода, местное время и карта для любой точки мира</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel" aria-labelledby="panel-title">
+        <h2 class="visually-hidden" id="panel-title">Добавление виджета</h2>
+
+        <form class="panel__form" id="location-form" novalidate>
+          <div class="field">
+            <label class="field__label" for="lat-input">Широта</label>
+            <input class="field__input" id="lat-input" name="lat" type="text" inputmode="decimal"
+                   autocomplete="off" placeholder="от −90 до 90, например 56.84"
+                   aria-describedby="lat-error">
+            <p class="field__error" id="lat-error" aria-live="polite"></p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="lon-input">Долгота</label>
+            <input class="field__input" id="lon-input" name="lon" type="text" inputmode="decimal"
+                   autocomplete="off" placeholder="от −180 до 180, например 60.61"
+                   aria-describedby="lon-error">
+            <p class="field__error" id="lon-error" aria-live="polite"></p>
+          </div>
+          <div class="panel__buttons">
+            <button class="button button--primary" type="submit">Добавить виджет</button>
+            <button class="button button--ghost" id="geo-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+              Моё местоположение
+            </button>
+          </div>
+        </form>
+
+        <div class="panel__divider"><span>или</span></div>
+
+        <form class="panel__form panel__form--city" id="city-form" novalidate>
+          <div class="field">
+            <label class="field__label" for="city-input">Город</label>
+            <input class="field__input" id="city-input" name="city" type="text" autocomplete="off"
+                   placeholder="Например, Стамбул" maxlength="80" aria-describedby="city-error">
+            <p class="field__error" id="city-error" aria-live="polite"></p>
+          </div>
+          <div class="panel__buttons">
+            <button class="button button--secondary" id="city-submit" type="submit">Найти и добавить</button>
+          </div>
+        </form>
+
+        <p class="status" id="status" role="status" hidden></p>
+      </section>
+
+      <section class="widgets" aria-labelledby="widgets-title">
+        <div class="widgets__header">
+          <h2 class="widgets__title" id="widgets-title">Мои виджеты</h2>
+          <span class="widgets__counter" id="widget-counter">0 из 12</span>
+        </div>
+        <p class="widgets__empty" id="empty-state" hidden>
+          Здесь пока пусто. Введите координаты или название города, чтобы добавить первый виджет.
+        </p>
+        <div class="widgets__list" id="widget-list"></div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      Данные о погоде — <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a>,
+      карта — <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© участники OpenStreetMap</a>
+    </footer>
+  </div>
+
+  <template id="widget-template">
+    <article class="widget" data-state="loading" aria-busy="true">
+      <header class="widget__header">
+        <div class="widget__heading">
+          <h3 class="widget__place" data-field="placeName">Загрузка…</h3>
+          <p class="widget__coords" data-field="coords"></p>
+        </div>
+        <div class="widget__actions">
+          <button class="icon-button" type="button" data-action="refresh" aria-label="Обновить погоду" title="Обновить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+          </button>
+          <button class="icon-button" type="button" data-action="remove" aria-label="Удалить виджет" title="Удалить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="widget__loader">
+        <span class="spinner" aria-hidden="true"></span>
+        Загружаем погоду…
+      </div>
+
+      <div class="widget__error" role="alert">
+        <p data-field="error"></p>
+        <button class="button button--small" type="button" data-action="refresh">Повторить</button>
+      </div>
+
+      <div class="widget__content">
+        <div class="widget__now">
+          <div class="widget__icon" data-field="icon"></div>
+          <div class="widget__summary">
+            <p class="widget__temperature" data-field="temperature"></p>
+            <p class="widget__description" data-field="description"></p>
+            <p class="widget__feels">Ощущается как <span data-field="feelsLike"></span></p>
+          </div>
+        </div>
+
+        <div class="widget__clock">
+          <span class="widget__time" data-clock="time">--:--:--</span>
+          <span class="widget__date" data-clock="date"></span>
+        </div>
+
+        <dl class="widget__details">
+          <div class="detail">
+            <dt>Ветер</dt>
+            <dd>
+              <span class="wind-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3l6 16-6-4-6 4z"/></svg>
+              </span>
+              <span data-field="wind"></span>
+            </dd>
+          </div>
+          <div class="detail"><dt>Влажность</dt><dd data-field="humidity"></dd></div>
+          <div class="detail"><dt>Давление</dt><dd data-field="pressure"></dd></div>
+          <div class="detail"><dt>Мин / макс</dt><dd data-field="minMax"></dd></div>
+          <div class="detail"><dt>Восход / закат</dt><dd data-field="sun"></dd></div>
+          <div class="detail"><dt>Часовой пояс</dt><dd data-field="timezone"></dd></div>
+        </dl>
+      </div>
+
+      <div class="widget__map">
+        <iframe class="widget__map-frame" loading="lazy" title="Карта"></iframe>
+        <a class="widget__map-link" target="_blank" rel="noopener noreferrer">Открыть большую карту ↗</a>
+      </div>
+    </article>
+  </template>
+</body>
+</html>
